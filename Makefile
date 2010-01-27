@@ -14,5 +14,4 @@ run:
 	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib erl -pa ./ebin -sname zerg
 
 ex:
-	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib	./examples/run_job.erl
-	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib	./examples/wait_job.erl
+	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib	./examples/job_stat.erl
