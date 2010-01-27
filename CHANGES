@@ -1,0 +1,7 @@
+Version 0.1 (2010-01-27)
+ - Initial version
+   - Supports only pbs_statjob operation
+     - Connect to default server
+     - Obtain status of batch job (pbs_statjob)
+   - Usage example
+     - job_stat.erl
