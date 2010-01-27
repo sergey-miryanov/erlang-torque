@@ -1,10 +1,14 @@
 -module (torque).
 -author ('sergey.miryanov@gmail.com').
 
+-behaviour (gen_server).
+
 -export ([start_link/1]).
 
 %% gen_server
 -export ([init/1, handle_call/3]).
+-export ([handle_cast/2, handle_info/2,
+    terminate/2, code_change/3]).
 
 %% API
 -export ([job_stat/1]).
@@ -36,6 +40,22 @@ init (Server) ->
       io:format ("Error loading torque driver: ~p~n", [erl_ddll:format_error (Error)]),
       {stop, failed}
   end.
+
+code_change (_OldVsn, State, _Extra) ->
+  {ok, State}.
+
+handle_cast (_Msg, State) ->
+  {noreply, State}.
+
+handle_info (_Info, State) ->
+  {noreply, State}.
+
+terminate (normal, #state {port = Port}) ->
+  port_command (Port, term_to_binary ({close, nop})),
+  port_close (Port),
+  ok;
+terminate (_Reason, _State) ->
+  ok.
 
 handle_call ({job_stat, JobID}, _From, #state {port = Port} = State) ->
   Reply = torque:control (Port, ?CMD_STAT_JOB, erlang:list_to_binary (JobID)),
