@@ -1,4 +1,3 @@
-#include <pbs_config.h>
 #include <pbs_ifl.h>
 #include <pbs_error.h>
 #include <erl_driver.h>
