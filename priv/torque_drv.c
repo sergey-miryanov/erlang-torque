@@ -170,7 +170,7 @@ static int check_error (torque_drv_t *drv, const char *server)
         {
           fprintf(drv->log, "Cannot connect to default server host '%s' - check pbs_server daemon.\n", 
                   pbs_default());
-          fprintf (drv->log, "Or try to connect to fallback server: %s\n", pbs_fbserver);
+          fprintf (drv->log, "Or try to connect to fallback server: %s\n", pbs_fbserver ());
         }
       else
         {
