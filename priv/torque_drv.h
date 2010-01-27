@@ -5,6 +5,8 @@
 #include <ei.h>
 #include <erl_interface.h>
 
+#define CMD_STAT_JOB  1
+
 typedef struct torque_drv_t {
     unsigned int  key;
     ErlDrvPort    port;
@@ -33,3 +35,16 @@ ready_async (ErlDrvData drv,
 
 static int
 torque_connect (torque_drv_t *drv, char *server);
+
+static int
+stat_job (torque_drv_t *drv, 
+          char *job_name);
+
+static int
+send_msg (torque_drv_t *drv,
+          const char *tag,
+          const char *msg);
+
+static int
+send_atom (torque_drv_t *drv,
+           char *atom);
