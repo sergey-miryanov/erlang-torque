@@ -25,7 +25,7 @@ static ErlDrvEntry driver_entry__ = {
   ERL_DRV_FLAG_USE_PORT_LOCKING     /* ERL_DRV_FLAGs */
 };
 
-DRIVER_INIT (drmaa_driver)
+DRIVER_INIT (torque_driver)
 {
   return &driver_entry__;
 }
