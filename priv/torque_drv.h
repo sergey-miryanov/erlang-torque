@@ -6,6 +6,7 @@
 
 #define CMD_STAT_JOB      1
 #define CMD_STAT_QUEUE    2
+#define CMD_CONNECT       3
 
 typedef struct torque_drv_t {
     unsigned int  key;
@@ -32,6 +33,9 @@ control (ErlDrvData drv,
 static void
 ready_async (ErlDrvData drv,
              ErlDrvThreadData thread_data);
+
+static int
+torque_disconnect (torque_drv_t *drv);
 
 static int
 torque_connect (torque_drv_t *drv, char *server);

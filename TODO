@@ -3,11 +3,9 @@
      obtain list of jobs
    - Implement reading of specified attributes 
      for pbs_statjob (and pbs_selstat)
-   - Move connection to server from driver start
-     function to another 'connect' function to 
-     provide better error diagnostic
    - Check is driver connected to server before
      any pbs_* operation
+   - Fix errors that occured while driver terminated
 
 - Erlang
 - Documentation

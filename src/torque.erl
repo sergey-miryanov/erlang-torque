@@ -11,6 +11,7 @@
     terminate/2, code_change/3]).
 
 %% API
+-export ([connect/1]).
 -export ([job_stat/1, queue_stat/1, server_stat/0]).
 
 %% Internal
@@ -18,11 +19,15 @@
 
 -define ('CMD_STAT_JOB',    1).
 -define ('CMD_STAT_QUEUE',  2).
+-define ('CMD_CONNECT',     3).
 
 -record (state, {port}).
 
 start_link (Server) ->
   gen_server:start_link ({local, torque}, ?MODULE, Server, []).
+
+connect (Server) ->
+  gen_server:call (torque, {connect, Server}).
 
 job_stat (JobID) when is_list (JobID) ->
   gen_server:call (torque, {job_stat, JobID}).
@@ -41,8 +46,15 @@ init (Server) ->
   case erl_ddll:load (SearchDir, "torque_drv")
   of
     ok ->
-      Port = open_port ({spawn, string:join (["torque_drv", Server], " ")}, [binary]),
-      {ok, #state {port = Port}};
+      Port = open_port ({spawn, "torque_drv"}, [binary]),
+      case torque:control (Port, ?CMD_CONNECT, erlang:list_to_binary (Server))
+      of
+        {ok} ->
+          {ok, #state {port = Port}};
+        {error, Error} ->
+          io:format ("Error connecting to server: ~p~n", [Error]),
+          {stop, failed}
+      end;
     {error, Error} ->
       io:format ("Error loading torque driver: ~p~n", [erl_ddll:format_error (Error)]),
       {stop, failed}
@@ -69,6 +81,9 @@ handle_call ({job_stat, JobID}, _From, #state {port = Port} = State) ->
   {reply, Reply, State};
 handle_call ({queue_stat, QueueID}, _From, #state {port = Port} = State) ->
   Reply = torque:control (Port, ?CMD_STAT_QUEUE, erlang:list_to_binary (QueueID)),
+  {reply, Reply, State};
+handle_call ({connect, Server}, _From, #state {port = Port} = State) ->
+  Reply = torque:control (Port, ?CMD_CONNECT, erlang:list_to_binary (Server)),
   {reply, Reply, State};
 handle_call (Request, _From, State) ->
   {reply, {unknown, Request}, State}.

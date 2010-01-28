@@ -53,43 +53,7 @@ start (ErlDrvPort port, char *cmd)
   drv->key  = 46;
   drv->port = port;
   drv->log  = log;
-
-  char *server = strstr (cmd, " ");
-  if (!server)
-    {
-      fprintf (drv->log, "Name of server to connect should be passed to driver (cmd: %s)\n",
-               cmd);
-      fprintf (drv->log, "Default server name will be used\n");
-      fflush (drv->log);
-    }
-
-  if (!server)
-    {
-      char *default_server = pbs_default ();
-      if (!default_server)
-        {
-          fprintf (drv->log, "Couldn't obtain default server name\n");
-          fflush (drv->log);
-
-          default_server = "";
-        }
-
-      server = default_server;
-    }
-  else
-    {
-      ++server;
-    }
-
-  drv->pbs_connect = torque_connect (drv, server); 
-  if (drv->pbs_connect <= 0)
-    {
-      fprintf (drv->log, "Couldn't connect to PBS (Torque) server\n");
-    }
-  else
-    {
-      fprintf (drv->log, "Connect to PBS (Torque) server: %s\n", server);
-    }
+  drv->pbs_connect = 0;
 
   fflush (drv->log);
   return (ErlDrvData) drv;
@@ -102,14 +66,7 @@ stop (ErlDrvData drv_data)
 
   if (drv->pbs_connect > 0)
     {
-      if (pbs_disconnect (drv->pbs_connect))
-        {
-          fprintf (drv->log, "Couldn't disconnect from PBS (Torque) server: %d\n", pbs_errno);
-        }
-      else
-        {
-          fprintf (drv->log, "Disconnect from PBS (Torque) server\n");
-        }
+      torque_disconnect (drv);
     }
 
   fclose (drv->log);
@@ -135,6 +92,8 @@ control (ErlDrvData drv_data,
       return stat_job (drv, buf);
     case CMD_STAT_QUEUE:
       return stat_queue (drv, buf);
+    case CMD_CONNECT:
+      return torque_connect (drv, buf);
     default:
       return send_msg (drv, "error", "Unknown command");
     }
@@ -212,28 +171,83 @@ check_error (torque_drv_t *drv, const char *server)
 }
 
 static int
+torque_disconnect (torque_drv_t *drv)
+{
+  if (pbs_disconnect (drv->pbs_connect))
+    {
+      fprintf (drv->log, "Couldn't disconnect from PBS (Torque) server: %s\n", pbse_to_txt (pbs_errno));
+      fflush (drv->log);
+    }
+  else
+    {
+      fprintf (drv->log, "Disconnect from PBS (Torque) server\n");
+      fflush (drv->log);
+    }
+
+  drv->pbs_connect = 0;
+}
+
+static int
 torque_connect (torque_drv_t *drv, char *server)
 {
+  if (drv->pbs_connect > 0)
+    {
+      fprintf (drv->log, "Driver already connected to server, disconnect and connect to new server: %s\n",
+               server);
+      fflush (drv->log);
+
+      torque_disconnect (drv);
+    }
+
+  if (strlen (server) == 0)
+    {
+      char *default_server = pbs_default ();
+      if (!default_server)
+        {
+          fprintf (drv->log, "Couldn't obtain default server name\n");
+          fflush (drv->log);
+
+          default_server = "";
+        }
+
+      server = default_server;
+    }
+
   drv->pbs_connect = pbs_connect (server);
   if (drv->pbs_connect <= 0)
     {
       if (pbs_errno > PBSE_)
         {
-          return check_pbs_error (drv, server);
+          check_pbs_error (drv, server);
+          return send_msg (drv, "error", "PBS (Torque) error");
         }
       else
         {
-          return check_error (drv, server);
+          check_error (drv, server);
+          return send_msg (drv, "error", "System error");
         }
     }
+  else
+    {
+      fprintf (drv->log, "Connect to PBS (Torque) server: %s\n", server);
+      fflush (drv->log);
+    }
 
-  return drv->pbs_connect;
+  return send_atom (drv, "ok");
 }
 
 static int
 stat_job (torque_drv_t *drv,
           char *job_name)
 {
+  if (drv->pbs_connect <= 0)
+    {
+      fprintf (drv->log, "Connect to server first\n");
+      fflush (drv->log);
+
+      return send_msg (drv, "error", "Connect to server first");
+    }
+
   struct batch_status *p_status = pbs_statjob (drv->pbs_connect,
                                                job_name,
                                                NULL,
@@ -294,6 +308,14 @@ static int
 stat_queue (torque_drv_t *drv, 
             char *queue_name)
 {
+  if (drv->pbs_connect <= 0)
+    {
+      fprintf (drv->log, "Connect to server first\n");
+      fflush (drv->log);
+
+      return send_msg (drv, "error", "Connect to server first");
+    }
+
   struct batch_status *p_status = pbs_statjob (drv->pbs_connect,
                                                queue_name,
                                                NULL,
