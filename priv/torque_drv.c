@@ -111,6 +111,8 @@ control (ErlDrvData drv_data,
     {
     case CMD_STAT_JOB:
       return stat_job (drv, buf);
+    case CMD_STAT_QUEUE:
+      return stat_queue (drv, buf);
     default:
       return send_msg (drv, "error", "Unknown command");
     }
@@ -162,7 +164,8 @@ check_pbs_error (torque_drv_t *drv, const char *server)
   return drv->pbs_connect;
 }
 
-static int check_error (torque_drv_t *drv, const char *server)
+static int 
+check_error (torque_drv_t *drv, const char *server)
 {
   if (errno == ECONNREFUSED)
     {
@@ -233,12 +236,142 @@ stat_job (torque_drv_t *drv,
     }
 
   size_t result_idx = 0;
-  size_t attr_count = 0;
-
   result[result_idx++] = ERL_DRV_ATOM;
   result[result_idx++] = driver_mk_atom ("ok");
 
-  struct attrl *attr = p_status->attribs;
+  result = make_attr_result (drv, p_status->attribs, result, &result_idx);
+  if (!result)
+    {
+      pbs_statfree (p_status);
+      return 0;
+    }
+
+  result = driver_realloc (result, sizeof (*result) * (result_idx + 2));
+  if (!result)
+    {
+      fprintf (drv->log, "Couldn't reallocate memory for driver\n");
+      fflush (drv->log);
+
+      pbs_statfree (p_status);
+      return send_msg (drv, "error", "Couldn't reallocate memory for driver");
+    }
+
+  result[result_idx++] = ERL_DRV_TUPLE;
+  result[result_idx++] = 2;
+
+  int r = driver_output_term (drv->port,
+                              result,
+                              result_idx);
+
+  pbs_statfree (p_status);
+  driver_free (result);
+  return r;
+}
+
+static int
+stat_queue (torque_drv_t *drv, 
+            char *queue_name)
+{
+  struct batch_status *p_status = pbs_statjob (drv->pbs_connect,
+                                               queue_name,
+                                               NULL,
+                                               EXECQUEONLY);
+  if (!p_status)
+    {
+      fprintf (drv->log, "Couldn't obtain queue status: (%s, %s)\n",
+               queue_name, pbse_to_txt (pbs_errno));
+      fflush (drv->log);
+
+      return send_msg (drv, "error", "Couldn't obtain queue status");
+    }
+
+  ErlDrvTermData *result = (ErlDrvTermData *) driver_alloc (sizeof (ErlDrvTermData) * 2);
+  if (!result)
+    {
+      fprintf (drv->log, "Couldn't allocate memory for driver\n");
+      fflush (drv->log);
+
+      pbs_statfree (p_status);
+      return send_msg (drv, "error", "Couldn't allocate memory for driver");
+    }
+
+  size_t result_idx = 0;
+  result[result_idx++] = ERL_DRV_ATOM;
+  result[result_idx++] = driver_mk_atom ("ok");
+
+  struct batch_status *job = p_status;
+
+  size_t job_idx = 0;
+  for (; job; ++job_idx, job = job->next)
+    {
+      result = (ErlDrvTermData *) driver_realloc (result, sizeof (*result) * (result_idx + 3));
+      if (!result)
+        {
+          fprintf (drv->log, "Couldn't reallocate memory for driver\n");
+          fflush (drv->log);
+
+          pbs_statfree (p_status);
+          return send_msg (drv, "error", "Couldn't reallocate memory for driver");
+        }
+
+      result[result_idx++] = ERL_DRV_STRING;
+      result[result_idx++] = (ErlDrvTermData)job->name;
+      result[result_idx++] = strlen (job->name);
+
+      result = make_attr_result (drv, job->attribs, result, &result_idx);
+      if (!result)
+        {
+          pbs_statfree (p_status);
+          return 0;
+        }
+
+      result = (ErlDrvTermData *) driver_realloc (result, sizeof (*result) * (result_idx + 2));
+      if (!result)
+        {
+          fprintf (drv->log, "Couldn't reallocate memory for driver\n");
+          fflush (drv->log);
+
+          pbs_statfree (p_status);
+          return send_msg (drv, "error", "Couldn't reallocate memory for driver");
+        }
+
+      result[result_idx++] = ERL_DRV_TUPLE;
+      result[result_idx++] = 2;
+    }
+
+  result = driver_realloc (result, sizeof (*result) * (result_idx + 5));
+  if (!result)
+    {
+      fprintf (drv->log, "Couldn't reallocate memory for driver\n");
+      fflush (drv->log);
+
+      pbs_statfree (p_status);
+      return send_msg (drv, "error", "Couldn't reallocate memory for driver");
+    }
+
+  result[result_idx++] = ERL_DRV_NIL;
+  result[result_idx++] = ERL_DRV_LIST;
+  result[result_idx++] = job_idx + 1;
+  result[result_idx++] = ERL_DRV_TUPLE;
+  result[result_idx++] = 2;
+
+  int r = driver_output_term (drv->port,
+                              result,
+                              result_idx);
+
+  pbs_statfree (p_status);
+  driver_free (result);
+  return r;
+}
+
+static ErlDrvTermData *
+make_attr_result (torque_drv_t *drv,
+                  struct attrl *attr,
+                  ErlDrvTermData *result,
+                  size_t *p_result_idx)
+{
+  size_t result_idx = *p_result_idx;
+  size_t attr_count = 0;
   for (;attr; ++attr_count)
     {
       size_t item_count = 2;
@@ -251,8 +384,8 @@ stat_job (torque_drv_t *drv,
           fprintf (drv->log, "Couldn't reallocate memory for driver\n");
           fflush (drv->log);
 
-          pbs_statfree (p_status);
-          return send_msg (drv, "error", "Couldn't reallocate memory for driver");
+          send_msg (drv, "error", "Couldn't reallocate memory for driver");
+          return 0;
         }
 
       result[result_idx++] = ERL_DRV_STRING;
@@ -277,29 +410,22 @@ stat_job (torque_drv_t *drv,
       attr = attr->next;
     }
 
-  result = driver_realloc (result, sizeof (*result) * (result_idx + 5));
+  result = driver_realloc (result, sizeof (*result) * (result_idx + 3));
   if (!result)
     {
       fprintf (drv->log, "Couldn't reallocate memory for driver\n");
       fflush (drv->log);
 
-      pbs_statfree (p_status);
-      return send_msg (drv, "error", "Couldn't reallocate memory for driver");
+      send_msg (drv, "error", "Couldn't reallocate memory for driver");
+      return 0;
     }
 
   result[result_idx++] = ERL_DRV_NIL;
   result[result_idx++] = ERL_DRV_LIST;
   result[result_idx++] = attr_count + 1;
-  result[result_idx++] = ERL_DRV_TUPLE;
-  result[result_idx++] = 2;
 
-  int r = driver_output_term (drv->port,
-                              result,
-                              result_idx);
-
-  pbs_statfree (p_status);
-  driver_free (result);
-  return r;
+  *p_result_idx = result_idx;
+  return result;
 }
 
 static int

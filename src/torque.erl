@@ -11,12 +11,13 @@
     terminate/2, code_change/3]).
 
 %% API
--export ([job_stat/1]).
+-export ([job_stat/1, queue_stat/1, server_stat/0]).
 
 %% Internal
 -export ([control/3]).
 
--define ('CMD_STAT_JOB', 1).
+-define ('CMD_STAT_JOB',    1).
+-define ('CMD_STAT_QUEUE',  2).
 
 -record (state, {port}).
 
@@ -25,6 +26,12 @@ start_link (Server) ->
 
 job_stat (JobID) when is_list (JobID) ->
   gen_server:call (torque, {job_stat, JobID}).
+
+queue_stat (QueueID) when is_list (QueueID) ->
+  gen_server:call (torque, {queue_stat, QueueID}).
+
+server_stat () ->
+  gen_server:call (torque, {queue_stat, ""}).
 
 %% gen_server
 
@@ -59,6 +66,9 @@ terminate (_Reason, _State) ->
 
 handle_call ({job_stat, JobID}, _From, #state {port = Port} = State) ->
   Reply = torque:control (Port, ?CMD_STAT_JOB, erlang:list_to_binary (JobID)),
+  {reply, Reply, State};
+handle_call ({queue_stat, QueueID}, _From, #state {port = Port} = State) ->
+  Reply = torque:control (Port, ?CMD_STAT_QUEUE, erlang:list_to_binary (QueueID)),
   {reply, Reply, State};
 handle_call (Request, _From, State) ->
   {reply, {unknown, Request}, State}.

@@ -4,7 +4,8 @@
 #include <ei.h>
 #include <erl_interface.h>
 
-#define CMD_STAT_JOB  1
+#define CMD_STAT_JOB      1
+#define CMD_STAT_QUEUE    2
 
 typedef struct torque_drv_t {
     unsigned int  key;
@@ -38,6 +39,16 @@ torque_connect (torque_drv_t *drv, char *server);
 static int
 stat_job (torque_drv_t *drv, 
           char *job_name);
+
+static int
+stat_queue (torque_drv_t *drv,
+            char *queue_name);
+
+static ErlDrvTermData *
+make_attr_result (torque_drv_t *drv,
+                  struct attrl *attr,
+                  ErlDrvTermData *result,
+                  size_t *result_idx);
 
 static int
 send_msg (torque_drv_t *drv,

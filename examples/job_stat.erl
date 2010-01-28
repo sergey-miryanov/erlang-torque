@@ -14,7 +14,7 @@ print_stat (Stat) ->
 main (_) ->
 
   torque:start_link ("casper"),
-  {ok, List} = torque:job_stat ("66.casper"),
+  {ok, List} = torque:job_stat ("70.casper"),
   lists:foreach (fun (A) -> print_stat (A) end, List),
 
   ok.

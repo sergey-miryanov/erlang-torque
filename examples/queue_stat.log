@@ -1,0 +1,7 @@
+./examples/queue_stat.erl:5: Warning: variable 'Attr' is unused
+Name of each job at the server: 
+"76.casper"
+"77.casper"
+Name of each job at the 'batch' queue: 
+"76.casper"
+"77.casper"
