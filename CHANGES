@@ -1,3 +1,9 @@
+Version 0.2 (2010-01-28)
+ - Improve error diagnostic
+ - Move connection to server to separate function
+ - Add torque:connect, torque:queue_stat, torque:server_stat
+ - Add example/queue_stat.erl 
+
 Version 0.1 (2010-01-27)
  - Initial version
    - Supports only pbs_statjob operation
