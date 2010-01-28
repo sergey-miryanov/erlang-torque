@@ -54,23 +54,41 @@ start (ErlDrvPort port, char *cmd)
   drv->port = port;
   drv->log  = log;
 
-  char *default_server = pbs_default ();
-  if (!default_server)
+  char *server = strstr (cmd, " ");
+  if (!server)
     {
-      fprintf (drv->log, "Couldn't obtain default server name\n");
+      fprintf (drv->log, "Name of server to connect should be passed to driver (cmd: %s)\n",
+               cmd);
+      fprintf (drv->log, "Default server name will be used\n");
       fflush (drv->log);
-
-      default_server = "";
     }
 
-  drv->pbs_connect = torque_connect (drv, default_server); 
+  if (!server)
+    {
+      char *default_server = pbs_default ();
+      if (!default_server)
+        {
+          fprintf (drv->log, "Couldn't obtain default server name\n");
+          fflush (drv->log);
+
+          default_server = "";
+        }
+
+      server = default_server;
+    }
+  else
+    {
+      ++server;
+    }
+
+  drv->pbs_connect = torque_connect (drv, server); 
   if (drv->pbs_connect <= 0)
     {
       fprintf (drv->log, "Couldn't connect to PBS (Torque) server\n");
     }
   else
     {
-      fprintf (drv->log, "Connect to PBS (Torque) server: %s\n", default_server);
+      fprintf (drv->log, "Connect to PBS (Torque) server: %s\n", server);
     }
 
   fflush (drv->log);
@@ -81,13 +99,17 @@ static void
 stop (ErlDrvData drv_data)
 {
   torque_drv_t *drv = (torque_drv_t *) (drv_data);
-  if (pbs_disconnect (drv->pbs_connect))
+
+  if (drv->pbs_connect > 0)
     {
-      fprintf (drv->log, "Couldn't disconnect from PBS (Torque) server: %d\n", pbs_errno);
-    }
-  else
-    {
-      fprintf (drv->log, "Disconnect from PBS (Torque) server\n");
+      if (pbs_disconnect (drv->pbs_connect))
+        {
+          fprintf (drv->log, "Couldn't disconnect from PBS (Torque) server: %d\n", pbs_errno);
+        }
+      else
+        {
+          fprintf (drv->log, "Disconnect from PBS (Torque) server\n");
+        }
     }
 
   fclose (drv->log);

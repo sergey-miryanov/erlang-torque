@@ -1,5 +1,4 @@
 - Driver
-   - Pass server name to driver
    - Implement wrapper for pbs_selstat to 
      obtain list of jobs
    - Implement reading of specified attributes 
