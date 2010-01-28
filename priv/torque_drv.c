@@ -103,9 +103,13 @@ control (ErlDrvData drv_data,
       switch (command)
         {
         case CMD_STAT_JOB:
-          return stat_job (drv, buf);
+          return stat_job (drv, buf, NULL);
         case CMD_STAT_QUEUE:
-          return stat_queue (drv, buf);
+          return stat_queue (drv, buf, NULL);
+        case CMD_STAT_JOB_A:
+          return stat_job_a (drv, buf);
+        case CMD_STAT_QUEUE_A:
+          return stat_queue_a (drv, buf);
         default:
           return send_msg (drv, "error", "Unknown command");
         }
@@ -256,11 +260,12 @@ torque_connect (torque_drv_t *drv, char *server)
 
 static int
 stat_job (torque_drv_t *drv,
-          char *job_name)
+          char *job_name,
+          struct attrl *filter)
 {
   struct batch_status *p_status = pbs_statjob (drv->pbs_connect,
                                                job_name,
-                                               NULL,
+                                               filter,
                                                EXECQUEONLY);
   if (!p_status)
     {
@@ -319,11 +324,12 @@ stat_job (torque_drv_t *drv,
 
 static int
 stat_queue (torque_drv_t *drv, 
-            char *queue_name)
+            char *queue_name,
+            struct attrl *filter)
 {
   struct batch_status *p_status = pbs_statjob (drv->pbs_connect,
                                                queue_name,
-                                               NULL,
+                                               filter,
                                                EXECQUEONLY);
   if (!p_status)
     {
@@ -416,6 +422,121 @@ stat_queue (torque_drv_t *drv,
   return r;
 }
 
+static int
+stat_job_a (torque_drv_t *drv,
+            char *command)
+{
+  char *job_name = command;
+  command = strstr (command, ",");
+  if (!command)
+    {
+      fprintf (drv->log, "Command should contains not only job name\n");
+      fflush (drv->log);
+
+      return stat_job (drv, job_name, NULL);
+    }
+
+  command[0] = 0;
+
+  struct attrl *filter = make_attrl_filter (drv, command + 1);
+  if (!filter)
+    {
+      return 0;
+    }
+
+  int r = stat_job (drv, job_name, filter);
+  driver_free (filter);
+
+  return r;
+}
+
+static int
+stat_queue_a (torque_drv_t *drv,
+              char *command)
+{
+  char *queue_name = command;
+  command = strstr (command, ",");
+  if (!command)
+    {
+      fprintf (drv->log, "Command should contains not only queue name\n");
+      fflush (drv->log);
+
+      return stat_queue (drv, queue_name, NULL);
+    }
+
+  command[0] = 0;
+
+  struct attrl *filter = make_attrl_filter (drv, command + 1);
+  if (!filter)
+    {
+      return 0;
+    }
+
+  int r = stat_queue (drv, queue_name, filter);
+  driver_free (filter);
+
+  return r;
+}
+
+static struct attrl *
+make_attrl_filter (torque_drv_t *drv,
+                   char *command)
+{
+  char *attr_count = command;
+  command = strstr (command, ",");
+  if (!command)
+    {
+      fprintf (drv->log, "Invalid command: %s\n", command);
+      fflush (drv->log);
+
+      send_msg (drv, "error", "Invalid command");
+      return 0;
+    }
+
+  ++command;
+
+  struct attrl *attrs = (struct attrl *) driver_alloc (sizeof (struct attrl) * atoi (attr_count));
+  if (!attrs)
+    {
+      fprintf (drv->log, "Couldn't allocate memory for attributes list\n");
+      fflush (drv->log);
+
+      send_msg (drv, "error", "Couldn't allocate memory");
+      return 0;
+    }
+
+  memset (attrs, 0, sizeof (struct attrl) * atoi (attr_count));
+
+  struct attrl *attr = attrs;
+  char *attr_id  = command;
+  char *attr_str = strstr (command, ",");
+  while (attr_id)
+    {
+      attr->next = attr + 1;
+      attr->name = get_attr_name (atoi (attr_id));
+      attr->resource = "";
+      attr->value = "";
+      ++attr;
+
+      if (!attr_str)
+        break;
+
+      attr_id = attr_str + 1;
+      attr_str = strstr (attr_str + 1, ",");
+    }
+
+  attr = attrs;
+  while (attr->next)
+    {
+      fprintf (drv->log, "name: %s\n", attr->name);
+      fflush (drv->log);
+
+      attr = attr->next;
+    }
+
+  return attrs;
+}
+
 static ErlDrvTermData *
 make_attr_result (torque_drv_t *drv,
                   struct attrl *attr,
@@ -478,6 +599,42 @@ make_attr_result (torque_drv_t *drv,
 
   *p_result_idx = result_idx;
   return result;
+}
+
+static char *
+get_attr_name (size_t attr_id)
+{
+  switch (attr_id)
+    {
+    case ATTR_EXECUTION_TIME:   return ATTR_a;
+    case ATTR_ACCOUNT_NAME:     return ATTR_A;
+    case ATTR_CHECKPOINT:       return ATTR_c;
+    case ATTR_ERROR_PATH:       return ATTR_e;
+    case ATTR_GROUP_LIST:       return ATTR_g;
+    case ATTR_HOLD_TYPES:       return ATTR_h;
+    case ATTR_JOIN_PATHS:       return ATTR_j;
+    case ATTR_KEEP_FILES:       return ATTR_k;
+    case ATTR_RESOURCE_LIST:    return ATTR_l;
+    case ATTR_MAIL_POINTS:      return ATTR_m;
+    case ATTR_MAIL_USERS:       return ATTR_M;
+    case ATTR_JOB_NAME:         return ATTR_N;
+    case ATTR_OUTPUT_PATH:      return ATTR_o;
+    case ATTR_PRIORITY:         return ATTR_p;
+    case ATTR_DESTINATION:      return ATTR_q;
+    case ATTR_RERUNABLE:        return ATTR_r;
+    case ATTR_SESSION_ID:       return ATTR_session;
+    case ATTR_SHELL_PATH_LIST:  return ATTR_S;
+    case ATTR_USER_LIST:        return ATTR_u;
+    case ATTR_VARIABLE_LIST:    return ATTR_v;
+    case ATTR_CREATE_TIME:      return ATTR_ctime;
+    case ATTR_DEPEND:           return ATTR_depend;
+    case ATTR_MODIF_TIME:       return ATTR_mtime;
+    case ATTR_QUEUE_TIME:       return ATTR_qtime;
+    case ATTR_QUEUE_TYPE:       return ATTR_qtype;
+    case ATTR_STAGEIN:          return ATTR_stagein;
+    case ATTR_STAGEOUT:         return ATTR_stageout;
+    case ATTR_JOB_STATE:        return ATTR_state;
+    }
 }
 
 static int

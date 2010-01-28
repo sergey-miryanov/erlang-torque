@@ -1,0 +1,2 @@
+- pbs_statjob for torque 2.4.4 generates SIGSEGV 
+  if attrib parameter not null
