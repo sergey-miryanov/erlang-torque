@@ -11,7 +11,7 @@ clean:
 	rm -rf ./*.beam
 
 run:
-	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib erl -pa ./ebin -sname zerg
+	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib:/opt/local/lib erl -pa ./ebin -sname zerg
 
 ex:
-	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib	./examples/job_stat.erl
+	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib:/opt/local/lib	./examples/job_stat.erl

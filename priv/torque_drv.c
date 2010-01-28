@@ -512,17 +512,17 @@ make_attrl_filter (torque_drv_t *drv,
   char *attr_str = strstr (command, ",");
   while (attr_id)
     {
-      attr->next = attr + 1;
       attr->name = get_attr_name (atoi (attr_id));
       attr->resource = "";
       attr->value = "";
-      ++attr;
 
       if (!attr_str)
         break;
 
       attr_id = attr_str + 1;
       attr_str = strstr (attr_str + 1, ",");
+      attr->next = attr + 1;
+      ++attr;
     }
 
   attr = attrs;
