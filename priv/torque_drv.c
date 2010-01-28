@@ -84,18 +84,31 @@ control (ErlDrvData drv_data,
          int rlen)
 {
   buf[len] = 0;
-
   torque_drv_t *drv = (torque_drv_t *) (drv_data);
-  switch (command)
+
+  if (command == CMD_CONNECT)
     {
-    case CMD_STAT_JOB:
-      return stat_job (drv, buf);
-    case CMD_STAT_QUEUE:
-      return stat_queue (drv, buf);
-    case CMD_CONNECT:
       return torque_connect (drv, buf);
-    default:
-      return send_msg (drv, "error", "Unknown command");
+    }
+  else
+    {
+      if (drv->pbs_connect <= 0)
+        {
+          fprintf (drv->log, "Connect to server first\n");
+          fflush (drv->log);
+
+          return send_msg (drv, "error", "Connect to server first");
+        }
+
+      switch (command)
+        {
+        case CMD_STAT_JOB:
+          return stat_job (drv, buf);
+        case CMD_STAT_QUEUE:
+          return stat_queue (drv, buf);
+        default:
+          return send_msg (drv, "error", "Unknown command");
+        }
     }
 
   return 0;
@@ -107,47 +120,55 @@ ready_async (ErlDrvData drv_data,
 {
 }
 
-static int
+static const char *
 check_pbs_error (torque_drv_t *drv, const char *server)
 {
+  char *error = "Communication failure";
   switch (pbs_errno)
     {
     case PBSE_BADHOST:
       if ((server == NULL) || (server[0] == '\0'))
         {
-          fprintf(drv->log, "Cannot resolve default server host '%s' - check server_name file.\n",
-                  pbs_default());
+          error = "Cannot resolve default server host";
+          fprintf(drv->log, "%s '%s' - check server_name file.\n",
+                  error, pbs_default());
         }
       else
         {
-          fprintf(drv->log, "Cannot resolve specified server host '%s'.\n", server);
+          error = "Cannot resolve specified server host";
+          fprintf(drv->log, "%s '%s'.\n", error, server);
         }
 
       break;
     case PBSE_NOCONNECTS:
-      fprintf(drv->log, "Too many open connections.\n");
+      error = "Too many open connections";
+      fprintf(drv->log, "%s.\n", error);
       break;
     case PBSE_NOSERVER:
-      fprintf(drv->log, "No default server name - check server_name file.\n");
+      error = "No default server name";
+      fprintf(drv->log, "%s - check server_name file.\n", error);
       break;
     case PBSE_SYSTEM:
-      fprintf(drv->log, "System call failure.\n");
+      error = "System call failure";
+      fprintf(drv->log, "%s.\n", error);
       break;
     case PBSE_PERM:
-      fprintf(drv->log, "No Permission.\n");
+      error = "No Permission";
+      fprintf(drv->log, "%s.\n", error);
       break;
     case PBSE_PROTOCOL:
     default:
-      fprintf(drv->log, "Communication failure.\n");
-      break;
+      fprintf(drv->log, "%s.\n", error);
     }
 
-  return drv->pbs_connect;
+  fflush (drv->log);
+  return error;
 }
 
-static int 
+static const char * 
 check_error (torque_drv_t *drv, const char *server)
 {
+  const char *error = "Unknown system error";
   if (errno == ECONNREFUSED)
     {
       if ((server == NULL) || (server[0] == '\0'))
@@ -161,13 +182,12 @@ check_error (torque_drv_t *drv, const char *server)
           fprintf(drv->log, "Cannot connect to specified server host '%s'.\n",
                   server);
         }
-    }
-  else
-    {
-      perror(NULL);
+
+      error = "Connection refused";
     }
 
-  return drv->pbs_connect;
+  fflush (drv->log);
+  return error;
 }
 
 static int
@@ -218,13 +238,11 @@ torque_connect (torque_drv_t *drv, char *server)
     {
       if (pbs_errno > PBSE_)
         {
-          check_pbs_error (drv, server);
-          return send_msg (drv, "error", "PBS (Torque) error");
+          return send_msg (drv, "error", check_pbs_error (drv, server));
         }
       else
         {
-          check_error (drv, server);
-          return send_msg (drv, "error", "System error");
+          return send_msg (drv, "error", check_error (drv, server));
         }
     }
   else
@@ -240,14 +258,6 @@ static int
 stat_job (torque_drv_t *drv,
           char *job_name)
 {
-  if (drv->pbs_connect <= 0)
-    {
-      fprintf (drv->log, "Connect to server first\n");
-      fflush (drv->log);
-
-      return send_msg (drv, "error", "Connect to server first");
-    }
-
   struct batch_status *p_status = pbs_statjob (drv->pbs_connect,
                                                job_name,
                                                NULL,
@@ -257,6 +267,9 @@ stat_job (torque_drv_t *drv,
       fprintf (drv->log, "Couldn't obtain job status: (%s, %s)\n",
                job_name, pbse_to_txt (pbs_errno));
       fflush (drv->log);
+
+      if (pbs_errno != PBSE_NONE)
+        return send_msg (drv, "error", pbse_to_txt (pbs_errno));
 
       return send_msg (drv, "error", "Couldn't obtain job status");
     }
@@ -308,14 +321,6 @@ static int
 stat_queue (torque_drv_t *drv, 
             char *queue_name)
 {
-  if (drv->pbs_connect <= 0)
-    {
-      fprintf (drv->log, "Connect to server first\n");
-      fflush (drv->log);
-
-      return send_msg (drv, "error", "Connect to server first");
-    }
-
   struct batch_status *p_status = pbs_statjob (drv->pbs_connect,
                                                queue_name,
                                                NULL,
@@ -325,6 +330,9 @@ stat_queue (torque_drv_t *drv,
       fprintf (drv->log, "Couldn't obtain queue status: (%s, %s)\n",
                queue_name, pbse_to_txt (pbs_errno));
       fflush (drv->log);
+
+      if (pbs_errno != PBSE_NONE)
+        return send_msg (drv, "error", pbse_to_txt (pbs_errno));
 
       return send_msg (drv, "error", "Couldn't obtain queue status");
     }

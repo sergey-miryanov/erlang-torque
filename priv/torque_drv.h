@@ -4,9 +4,9 @@
 #include <ei.h>
 #include <erl_interface.h>
 
+#define CMD_CONNECT       0
 #define CMD_STAT_JOB      1
 #define CMD_STAT_QUEUE    2
-#define CMD_CONNECT       3
 
 typedef struct torque_drv_t {
     unsigned int  key;

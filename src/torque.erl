@@ -17,9 +17,9 @@
 %% Internal
 -export ([control/3]).
 
+-define ('CMD_CONNECT',     0).
 -define ('CMD_STAT_JOB',    1).
 -define ('CMD_STAT_QUEUE',  2).
--define ('CMD_CONNECT',     3).
 
 -record (state, {port}).
 
