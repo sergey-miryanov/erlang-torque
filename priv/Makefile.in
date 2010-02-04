@@ -1,0 +1,8 @@
+ERL_INTERFACE=@ERLANG_LIB_DIR_erl_interface@
+ERL_ROOT=@ERLANG_ROOT_DIR@
+OUTPUT=../ebin/torque_drv.so
+LDFLAGS=-shared -fPIC -undefined -ltorque -lei -lerl_interface -L${ERL_INTERFACE}/lib -L/opt/local/lib
+CFLAGS=-o ${OUTPUT} -I${ERL_ROOT}/usr/include -I${ERL_INTERFACE}/include/ -I/usr/local/include -I/opt/local/include
+
+all:
+	gcc torque_drv.c ${LDFLAGS} ${CFLAGS}

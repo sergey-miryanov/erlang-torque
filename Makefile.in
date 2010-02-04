@@ -3,7 +3,7 @@ all: compile
 
 compile:
 	test -d ebin || mkdir ebin
-	erl -make
+	@ERL@ -make
 	cd priv && make
 
 clean:
@@ -12,7 +12,7 @@ clean:
 	rm -rf ./*.beam
 
 run:
-	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib:/opt/local/lib erl -pa ./ebin -sname zerg
+	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib:/opt/local/lib @ERL@ -pa ./ebin -sname zerg
 
 ex:
 	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib:/opt/local/lib	./examples/job_stat.erl
