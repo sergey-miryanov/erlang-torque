@@ -2,6 +2,7 @@
 all: compile
 
 compile:
+	test -d ebin || mkdir ebin
 	erl -make
 	cd priv && make
 
