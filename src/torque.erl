@@ -90,12 +90,10 @@ init (Server) ->
         {ok} ->
           {ok, #state {port = Port}};
         {error, Error} ->
-          io:format ("Error connecting to server: ~p~n", [Error]),
-          {stop, failed}
+          {stop, string:join (["Error connecting to server: ", Error], "")}
       end;
     {error, Error} ->
-      io:format ("Error loading torque driver: ~p~n", [erl_ddll:format_error (Error)]),
-      {stop, failed}
+      {stop, string:join (["Error loading torque driver: ", erl_ddll:format_error (Error)], "")}
   end.
 
 code_change (_OldVsn, State, _Extra) ->
